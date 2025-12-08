@@ -1,0 +1,1 @@
+case class FeatureFlag(val key: String, val rules: List[Rule])
