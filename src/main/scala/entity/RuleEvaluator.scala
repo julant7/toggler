@@ -1,16 +1,20 @@
 package entity
 
-import dto.{AddFlagRequest, CheckRequest, CheckResponse}
-import entity.{AlwaysOn, CountryAllow, Rule, UserList}
-import zio.http.Response
-import zio.{Task, UIO, ZIO}
+import dto.CheckRequest
 
 object RuleEvaluator {
   def evaluate(rule: Rule, request: CheckRequest, key: String): Boolean = {
     rule.condition match {
-      case AlwaysOn() => true
-      case UserList(userIds) => userIds.contains(request.userId)
+      case AlwaysOn() => {
+        println(1)
+        true
+      }
+      case UserList(userIds) => {
+        println(2)
+        userIds.contains(request.userId)
+      }
       case CountryAllow(countries) => 
+        println(3)
         request.attributes.get("country").exists(countries.contains)
     }
   }

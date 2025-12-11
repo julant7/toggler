@@ -17,8 +17,7 @@ libraryDependencies ++= {
     "dev.zio" %% "zio-test" % zioVersion,
     "dev.zio" %% "zio-test-sbt" % zioVersion % Test,
     "dev.zio" %% "zio-http" % "3.7.1",
-    "dev.zio" %% "zio-json" % "0.7.45",
-    "dev.zio" %% "zio-schema-json" % "0.7.45"
+    "dev.zio" %% "zio-json" % "0.7.45"
   )
 }
 

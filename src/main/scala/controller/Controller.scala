@@ -7,29 +7,38 @@ import zio.json.*
 import zio.http.*
 
 
-val routes1: Routes[FeatureService, Response] = Routes(
+val routes: Routes[FeatureService, Response] = Routes(
   Method.POST / "check" -> handler { (req: Request) =>
 
     val featureKey = req.url.queryParams("featureKey").asString
     val checkRequest = req.body.asString.map(_.fromJson[CheckRequest])
 
     (for {
-      kk <- checkRequest
+      request <- checkRequest
       service <- ZIO.service[FeatureService]
-      isEn <- service.isEnabled(featureKey, kk.getOrElse(null))
-    } yield {
-      Response.text(isEn.toJson)
-    }).orElseFail(Response.error(Status.BadRequest))
-
+      isEnabled <- request match {
+        case Left(message) => ZIO.succeed(Response.json(message).status(Status.BadRequest))
+        case Right(requestBody) => service.isEnabled(featureKey, requestBody).map(el => Response.text(el.toJson))
+      }
+    } yield isEnabled).mapError(err => Response.status(Status.InternalServerError))
   },
-//  Method.POST / "flags" -> handler{ (req: Request) =>
-//    val addFlagRequest = req.body.asString.map(_.fromJson[AddFlagRequest])
-//    for {
-//      service <- ZIO.service[FeatureService]
-//      addFlag <- service.upsert(addFlagRequest)
-//    } yield ZIO.succeed(Response.ok)
-//  },
-
+  Method.POST / "flags" -> handler { (req: Request) =>
+    val addFlagRequest = req.body.asString.map(_.fromJson[AddFlagRequest])
+    (for {
+      request <- addFlagRequest
+      service <- ZIO.service[FeatureService]
+      result <- request match {
+        case Left(message) => ZIO.succeed(Response.json(message).status(Status.BadRequest))
+        case Right(requestBody) => service.upsert(requestBody).map(_ => Response.ok)
+      }
+    } yield result).mapError(err => Response.status(Status.InternalServerError))
+  },
+  Method.GET / "flags" -> handler { (req: Request) =>
+    for {
+      service <- ZIO.service[FeatureService]
+      result <- service.getAll
+    } yield Response.json(result.toJson)
+  }
 )
 //object Controller extends ZIOAppDefault {
 //  val routes =

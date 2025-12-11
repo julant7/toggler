@@ -1,27 +1,25 @@
 package entity
 
-import zio.json.jsonDiscriminator
+import zio.json.{DeriveJsonCodec, DeriveJsonEncoder, JsonCodec, JsonEncoder, jsonDiscriminator, jsonHint, jsonNoExtraFields}
 import zio.schema.{DeriveSchema, Schema}
 
 case class Rule(condition: Condition, result: Boolean = true)
 
 object Rule {
-  implicit val schema: Schema[Rule] =
-    DeriveSchema.gen
-  implicit val jsonCodec: zio.json.JsonCodec[Rule] =
-    zio.schema.codec.JsonCodec.jsonCodec(schema)
+  implicit val codec: JsonCodec[Rule] =
+    DeriveJsonCodec.gen[Rule]
 }
 
-@jsonDiscriminator("type") sealed trait Condition
+@jsonDiscriminator("type")
+sealed trait Condition
 
 object Condition {
-  implicit val schema: Schema[Rule] =
-    DeriveSchema.gen
-  implicit val jsonCodec: zio.json.JsonCodec[Rule] =
-    zio.schema.codec.JsonCodec.jsonCodec(schema)
+  implicit val codec: JsonCodec[Condition] =
+    DeriveJsonCodec.gen[Condition]
 }
 
-case class AlwaysOn() extends Condition
+
+@jsonHint("omena") case class AlwaysOn() extends Condition
 
 case class UserList(userIds: Set[String]) extends Condition
 

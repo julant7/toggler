@@ -1,4 +1,4 @@
-import controller.routes1
+import controller.routes
 import dto.{CheckRequest, CheckResponse}
 import service.{FeatureService, InMemoryFeatureService}
 import zio.*
@@ -27,16 +27,7 @@ object Main extends ZIOAppDefault {
 //      client <- ZIO.service[Client]
 //      response <- endpointExecutor(client)(endpoint("priv", CheckRequest("7", Map("priv" -> "priv"))))
 //    } yield response
-    Server.serve(routes1).provide(InMemoryFeatureService.layer, Server.default)
-//    Server.serve(routes1).provide(InMemoryFeatureService.layer, Server.default)
-//    Server.serve(routes).provide(Server.default, InMemoryFeatureService.layer)
-//    for {
-//      service <- environment.map(_.get[FeatureService])
-//      isEnabled <- service.isEnabled("priv", entity.UserContext("124", Map("priv" -> "priv")))
-//      _ <- ZIO.succeed(assert(!isEnabled))
-//    } yield ()
-//    val jj = inMemoryFeatureService.flatMap(_.isEnabled("priv", null))
-//    ZIO.succeed(assert(jj.))
-//    val isEnabled = inMemoryFeatureService.
+    Server.serve(routes).provide(InMemoryFeatureService.layer, Server.defaultWithPort(8090))
+
   }
 }
