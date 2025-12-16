@@ -1,6 +1,6 @@
 import controller.routes
 import dto.{CheckRequest, CheckResponse}
-import service.{FeatureService, InMemoryFeatureService}
+import service.{FeatureService, InMemoryFeatureService, PostgresFeatureService}
 import zio.*
 import zio.http.*
 import zio.http.codec.HttpCodec
@@ -27,7 +27,8 @@ object Main extends ZIOAppDefault {
 //      client <- ZIO.service[Client]
 //      response <- endpointExecutor(client)(endpoint("priv", CheckRequest("7", Map("priv" -> "priv"))))
 //    } yield response
-    Server.serve(routes).provide(InMemoryFeatureService.layer, Server.defaultWithPort(8090))
+    Server.serve(routes).provide(PostgresFeatureService.layer, Server.defaultWithPort(8090))
+    
 
   }
 }
