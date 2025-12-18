@@ -1,11 +1,10 @@
 package entity
 
-import zio.*
-import zio.json.{DeriveJsonCodec, DeriveJsonEncoder, JsonCodec, JsonEncoder}
+import zio.json.{DeriveJsonCodec, JsonCodec}
 
-case class FeatureFlag(val key: String, val rules: List[Rule])
+case class FeatureFlag(id: Int, key: String, rules: List[Rule])
 
 object FeatureFlag {
-  implicit val codec: JsonCodec[FeatureFlag] =
-    DeriveJsonCodec.gen[FeatureFlag]
+
+  implicit val codec: JsonCodec[FeatureFlag] = DeriveJsonCodec.gen[FeatureFlag]
 }

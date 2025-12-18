@@ -16,6 +16,9 @@ object RuleEvaluator {
       case CountryAllow(countries) => 
         println(3)
         request.attributes.get("country").exists(countries.contains)
+      case _ =>
+        println(4)
+        false
     }
   }
 

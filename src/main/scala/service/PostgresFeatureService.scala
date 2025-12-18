@@ -2,86 +2,98 @@ package service
 
 import doobie.*
 import doobie.implicits.*
-import fs2.Stream
-import zio.{FiberRefs, Ref, RuntimeFlags, Task, UIO, Unsafe, ZEnvironment, ZIO, ZLayer}
+import doobie.postgres.circe.json.implicits.{pgDecoderGet, pgEncoderPut}
+import dto.{AddFlagRequest, CheckRequest, CheckResponse, GetFlagsResponse}
+import entity.{FeatureFlag, Rule, RuleEvaluator}
+import io.circe.syntax.EncoderOps
+import io.circe.{Encoder, Json}
+import zio.*
 import zio.interop.catz.*
-import dto.{AddFlagRequest, CheckRequest, CheckResponse}
-import entity.FeatureFlag
-import service.PostgresFeatureService.insert
 
-case class Flags(id: String, key: String, rules: String)
 
-class PostgresFeatureService(flags: Ref[List[Flags]]) extends FeatureService {
+class PostgresFeatureService(flags: Ref[Map[String, FeatureFlag]]) extends FeatureService {
 
-  override def isEnabled(featureKey: String, request: CheckRequest): UIO[CheckResponse] = ???
-
-//  override def upsert(newFeatureFlag: AddFlagRequest): UIO[Unit] = {
-//    for {
-//      res <- ZIO.succeed(Unit)
-//      _ <- fs2.Stream.eval(insert("always_on", """{"always_on": ""})"""))
-//    } yield res
-//  }
-
-  override def getAll: UIO[Map[String, FeatureFlag]] = ???
-  
-  def getAllFlags: UIO[List[Flags]] = flags.get
-
-  override def upsert(newFeatureFlag: AddFlagRequest): UIO[Unit] = ???
-}
-object PostgresFeatureService {
-  val layer: ZLayer[Any, Nothing, FeatureService] = ZLayer{
+  override def isEnabled(featureKey: String, request: CheckRequest): UIO[CheckResponse] = {
     for {
-      listFlags <- ZIO.succeed(allFlags)
-      refFlags <- Ref.make(listFlags)
-    } yield PostgresFeatureService(refFlags)
+      flags <- flags.get()
+    } yield {
+      CheckResponse(flags.get(featureKey).exists(feat => feat.rules.exists(rule => RuleEvaluator.evaluate(rule, request, featureKey))))
+    }
   }
 
-  implicit val zioRuntime: zio.Runtime[Any] = zio.Runtime(ZEnvironment.empty, FiberRefs.empty, RuntimeFlags.default)
+  override def getAll: UIO[GetFlagsResponse] = flags.get.map(flags => GetFlagsResponse(flags.values.toList))
+
+  override def upsert(request: AddFlagRequest): ZIO[Any, Throwable, Unit] = {
+    for {
+      xa <- DbConnector.xa
+      updatedFlag: FeatureFlag <- PostgresFeatureService.insert(request).transact(xa)
+      _ <- flags.update(_ + (updatedFlag.key -> updatedFlag))
+    } yield ()
+  }
+
+}
+object PostgresFeatureService {
+
+  implicit val metaListRule: Meta[List[Rule]] = new Meta(pgDecoderGet, pgEncoderPut)
+  implicit val metaJson: Meta[Json] = new Meta(pgDecoderGet, pgEncoderPut)
+
+  val layer: ZLayer[Any, Throwable, FeatureService] = ZLayer{
+
+    val flagMap: ZIO[Any, Throwable, Map[String, FeatureFlag]] = {
+      for {
+        flags <- allFlags()
+      } yield {
+        flags.map(el => (el.key -> el)).toMap
+      }
+    }
+    for {
+      flags <- flagMap
+      ref <- Ref.make(flags)
+    } yield PostgresFeatureService(ref)
+  }
 
   implicit def unsafe: Unsafe = null.asInstanceOf[zio.Unsafe]
 
-  def xa: Transactor[Task] =
-  Transactor.fromDriverManager[Task](
-    driver = "org.h2.Driver",
-    url = "jdbc:h2:mem:users;DB_CLOW_DELAY=-1",
-    user = "",
-    password = "",
-    logHandler = None
-  )
-
   def createTable: doobie.ConnectionIO[Int] =
-    //  sql"""|CREATE TABLE IF NOT EXISTS USERS(
-    //        |id INT SERIAL UNIQUE,
-    //        |name VARCHAR NOT NULL UNIQUE,
-    //        |age SMALLINT
-    //        |)""".stripMargin.update.run
-
     sql"""|CREATE TABLE IF NOT EXISTS FLAGS(
-          |id INT SERIAL UNIQUE,
+          |id SERIAL PRIMARY KEY,
           |key VARCHAR NOT NULL UNIQUE,
-          |rules JSONB
+          |rules JSON
           |)""".stripMargin.update.run
 
   def dropTable: doobie.ConnectionIO[Int] =
     sql"""DROP TABLE IF EXISTS FLAGS""".update.run
 
-  def insert(key: String, rules: String): doobie.ConnectionIO[Int] =
-    sql"INSERT INTO FLAGS(key, rules) values($key, $rules)".update.run
+  def insert(request: AddFlagRequest): doobie.ConnectionIO[FeatureFlag] = {
+    sql"""INSERT INTO FLAGS(key, rules)
+         VALUES(${request.key}, ${request.rules.asJson})
+         ON CONFLICT(key)
+         DO UPDATE SET rules = EXCLUDED.rules
+         RETURNING id, key, rules
+       """.query[FeatureFlag].unique
+  }
 
-  def loadUsers: Stream[doobie.ConnectionIO, Flags] =
-    sql"""SELECT * FROM FLAGS""".query[Flags].stream
+  def loadUsers: ConnectionIO[List[FeatureFlag]] = {
+    sql"""SELECT * FROM FLAGS""".query[FeatureFlag].to[List]
+  }
 
-  val doobieApp: Stream[doobie.ConnectionIO, Flags] = for {
-    _ <- fs2.Stream.eval(dropTable)
-    _ <- fs2.Stream.eval(createTable)
-    _ <- fs2.Stream.eval(insert("always_on", """{"always_on": ""})"""))
-    _ <- fs2.Stream.eval(insert("country", """{"countries": ["Russia", "India"]})"""))
-    u <- loadUsers
-  } yield u
+  def execute(): ZIO[Any, Throwable, List[FeatureFlag]] = {
+    for {
+      xa <- DbConnector.xa
+      _ <- dropTable.transact(xa)
+      _ <- createTable.transact(xa)
+//      _ <- insert(AddFlagRequest(key = "always_on8", rules = List(Rule(AlwaysOn())))).transact(xa)
+      hh <- loadUsers.transact(xa)
+    } yield hh
+  }
 
-  val run: Stream[Task, Flags] = doobieApp.transact(xa)
 
-  val allFlags: List[Flags] =
-    Unsafe.unsafe(implicit u => zioRuntime.unsafe.run(run.compile.toList)).getOrThrowFiberFailure()
+
+  val app: ConnectionIO[Unit] = for {
+    _ <- dropTable
+    _ <- createTable
+  } yield ()
+
+  def allFlags(): ZIO[Any, Throwable, List[FeatureFlag]] = execute()
 
 }

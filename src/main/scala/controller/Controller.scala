@@ -1,6 +1,7 @@
 package controller
 
-import dto.{AddFlagRequest, CheckRequest, CheckResponse}
+import dto.{AddFlagRequest, CheckRequest, CheckResponse, GetFlagsResponse}
+import entity.{AlwaysOn, FeatureFlag, Rule}
 import service.FeatureService
 import zio.*
 import zio.json.*
@@ -37,8 +38,10 @@ val routes: Routes[FeatureService, Response] = Routes(
     for {
       service <- ZIO.service[FeatureService]
       result <- service.getAll
-    } yield Response.json(result.toJson)
-  }
+    } yield Response.text(result.toJson)
+  },
+
+
 )
 //object Controller extends ZIOAppDefault {
 //  val routes =

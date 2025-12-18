@@ -1,13 +1,12 @@
 package service
 
-import dto.{AddFlagRequest, CheckRequest, CheckResponse}
+import dto.{AddFlagRequest, CheckRequest, CheckResponse, GetFlagsResponse}
 import zio.{UIO, ZIO}
-import zio.http.Response
 
 trait FeatureService {
   def isEnabled(featureKey: String, request: CheckRequest): UIO[CheckResponse]
   
-  def upsert(newFeatureFlag: AddFlagRequest): UIO[Unit]
+  def upsert(newFeatureFlag: AddFlagRequest): ZIO[Any, Throwable, Unit]
   
-  def getAll: UIO[Map[String, entity.FeatureFlag]]
+  def getAll: UIO[GetFlagsResponse]  
 }
