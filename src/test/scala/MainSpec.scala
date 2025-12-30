@@ -1,6 +1,5 @@
-import Main.environment
 import entity.UserContext
-import service.{FeatureService, InMemoryFeatureService}
+import service.{DbConnector, FeatureService, PostgresFeatureService}
 import zio.ZIO
 import zio.test.*
 
@@ -42,7 +41,7 @@ object MainSpec extends ZIOSpecDefault {
 //        isEnabled <- service.isEnabled("what", UserContext("user9", Map("what" -> "New Zealand")))
 //      } yield assertTrue(!isEnabled)
 //    }
-  ).provide(InMemoryFeatureService.layer)
+  )
 
 
 }

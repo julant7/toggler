@@ -8,5 +8,7 @@ trait FeatureService {
   
   def upsert(newFeatureFlag: AddFlagRequest): ZIO[Any, Throwable, Unit]
   
-  def getAll: UIO[GetFlagsResponse]  
+  def getAll: UIO[GetFlagsResponse]
+  
+  def updateCache(): zio.ZIO[Any, Throwable, Unit]
 }

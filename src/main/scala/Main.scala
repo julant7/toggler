@@ -1,12 +1,15 @@
 import controller.routes
 import dto.{CheckRequest, CheckResponse}
 import entity.{AlwaysOn, Rule}
-import service.{FeatureService, InMemoryFeatureService, PostgresFeatureService}
+import service.{DbConnector, FeatureService, PostgresFeatureService}
 import zio.*
 import zio.http.*
 import zio.http.codec.HttpCodec
 import zio.http.endpoint.{Endpoint, EndpointExecutor}
 import zio.json.EncoderOps
+
+import cats.effect.Async
+import cats.implicits.*
 
 object Main extends ZIOAppDefault {
 
@@ -22,7 +25,6 @@ object Main extends ZIOAppDefault {
 //        isEnabled <- service.isEnabled(featureKey, userContext)
 //      } yield isEnabled
 //    })
-  val environment = (InMemoryFeatureService.layer).build
   def endpointExecutor(client: Client) = EndpointExecutor(client, url"https://localhost:8090")
   override def run: ZIO[ZIOAppArgs & Scope, Any, Any] = {
 //    val clientApp: ZIO[Scope with Client, Nothing, CheckResponse] = for {
@@ -30,6 +32,7 @@ object Main extends ZIOAppDefault {
 //      response <- endpointExecutor(client)(endpoint("priv", CheckRequest("7", Map("priv" -> "priv"))))
 //    } yield response
 //    println(List(Rule(condition = AlwaysOn())).toJson)
-    Server.serve(routes).provide(PostgresFeatureService.layer, Server.defaultWithPort(8090))
+    val postgresFeatureServiceLayer = DbConnector.layer >>> PostgresFeatureService.layer
+    Server.serve(routes).provide(postgresFeatureServiceLayer, Server.defaultWithPort(8090))
   }
 }

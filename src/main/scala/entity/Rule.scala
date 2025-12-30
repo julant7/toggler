@@ -9,8 +9,7 @@ import zio.json.{DeriveJsonCodec, DeriveJsonEncoder, JsonCodec, JsonEncoder, jso
 case class Rule(condition: Condition, result: Boolean = true)
 
 object Rule {
-  implicit val codec: JsonCodec[Rule] =
-    DeriveJsonCodec.gen[Rule]
+  implicit val codec: JsonCodec[Rule] = DeriveJsonCodec.gen[Rule]
 
   implicit val encoder: Encoder[Rule] = deriveEncoder[Rule]
   implicit val decoder: io.circe.Decoder[Rule] = deriveDecoder[Rule]
@@ -29,9 +28,8 @@ object Condition {
 
 }
 
+@jsonHint("always_on") case class AlwaysOn() extends Condition
 
-@jsonHint("omena") case class AlwaysOn() extends Condition
+@jsonHint("user_list") case class UserList(userIds: Set[String]) extends Condition
 
-case class UserList(userIds: Set[String]) extends Condition
-
-case class CountryAllow(countries: Set[String]) extends Condition
+@jsonHint("country_allow") case class CountryAllow(countries: Set[String]) extends Condition

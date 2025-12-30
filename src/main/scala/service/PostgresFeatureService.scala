@@ -3,15 +3,19 @@ package service
 import doobie.*
 import doobie.implicits.*
 import doobie.postgres.circe.json.implicits.{pgDecoderGet, pgEncoderPut}
-import dto.{AddFlagRequest, CheckRequest, CheckResponse, GetFlagsResponse}
+import dto.{AddFlagRequest, CheckRequest, CheckResponse, GetFlagResponse, GetFlagsResponse}
 import entity.{FeatureFlag, Rule, RuleEvaluator}
 import io.circe.syntax.EncoderOps
 import io.circe.{Encoder, Json}
+import service.PostgresFeatureService.toDTO
 import zio.*
 import zio.interop.catz.*
 
+import java.sql.Timestamp
+import java.time.LocalDateTime
 
-class PostgresFeatureService(flags: Ref[Map[String, FeatureFlag]]) extends FeatureService {
+
+class PostgresFeatureService(flags: Ref[Map[String, FeatureFlag]], xa: Transactor[Task]) extends FeatureService {
 
   override def isEnabled(featureKey: String, request: CheckRequest): UIO[CheckResponse] = {
     for {
@@ -21,15 +25,24 @@ class PostgresFeatureService(flags: Ref[Map[String, FeatureFlag]]) extends Featu
     }
   }
 
-  override def getAll: UIO[GetFlagsResponse] = flags.get.map(flags => GetFlagsResponse(flags.values.toList))
+  override def getAll: UIO[GetFlagsResponse] = flags.get.map(flags => GetFlagsResponse(toDTO(flags.values.toList)))
 
   override def upsert(request: AddFlagRequest): ZIO[Any, Throwable, Unit] = {
     for {
-      xa <- DbConnector.xa
       updatedFlag: FeatureFlag <- PostgresFeatureService.insert(request).transact(xa)
       _ <- flags.update(_ + (updatedFlag.key -> updatedFlag))
     } yield ()
   }
+
+  override def updateCache(): zio.ZIO[Any, Throwable, Unit] = {
+    for {
+      curFlags <- flags.get()
+      updatedFlags <- PostgresFeatureService.updateCache(curFlags, Timestamp.valueOf(LocalDateTime.now())).transact(xa)
+    } yield updatedFlags.foreach(flag => flags.update(_ + (flag.key -> flag)))
+  }
+
+
+  def allFlags(): ZIO[Any, Throwable, List[FeatureFlag]] = PostgresFeatureService.execute(xa)
 
 }
 object PostgresFeatureService {
@@ -37,11 +50,12 @@ object PostgresFeatureService {
   implicit val metaListRule: Meta[List[Rule]] = new Meta(pgDecoderGet, pgEncoderPut)
   implicit val metaJson: Meta[Json] = new Meta(pgDecoderGet, pgEncoderPut)
 
-  val layer: ZLayer[Any, Throwable, FeatureService] = ZLayer{
+  val layer: ZLayer[DbConnector, Throwable, FeatureService] = ZLayer{
 
-    val flagMap: ZIO[Any, Throwable, Map[String, FeatureFlag]] = {
+    val flagMap: ZIO[DbConnector, Throwable, Map[String, FeatureFlag]] = {
       for {
-        flags <- allFlags()
+        dbConnector <- ZIO.service[DbConnector]
+        flags <- execute(dbConnector.transactor)
       } yield {
         flags.map(el => (el.key -> el)).toMap
       }
@@ -49,14 +63,15 @@ object PostgresFeatureService {
     for {
       flags <- flagMap
       ref <- Ref.make(flags)
-    } yield PostgresFeatureService(ref)
+      dbConnector <- ZIO.service[DbConnector]
+    } yield PostgresFeatureService(ref, dbConnector.transactor)
   }
 
   implicit def unsafe: Unsafe = null.asInstanceOf[zio.Unsafe]
 
   def createTable: doobie.ConnectionIO[Int] =
     sql"""|CREATE TABLE IF NOT EXISTS FLAGS(
-          |id SERIAL PRIMARY KEY,
+          |flag_id SERIAL PRIMARY KEY,
           |key VARCHAR NOT NULL UNIQUE,
           |rules JSON
           |)""".stripMargin.update.run
@@ -73,27 +88,39 @@ object PostgresFeatureService {
        """.query[FeatureFlag].unique
   }
 
+  def updateCache(flags: Map[String, FeatureFlag], date: Timestamp): ConnectionIO[List[FeatureFlag]] = {
+    sql"""SELECT *
+         FROM flags
+         WHERE id NOT IN ${flags.keySet.mkString(",")} OR date_updated > $date""".query[FeatureFlag].to[List]
+  }
+
   def loadUsers: ConnectionIO[List[FeatureFlag]] = {
     sql"""SELECT * FROM FLAGS""".query[FeatureFlag].to[List]
   }
-
-  def execute(): ZIO[Any, Throwable, List[FeatureFlag]] = {
-    for {
-      xa <- DbConnector.xa
-      _ <- dropTable.transact(xa)
-      _ <- createTable.transact(xa)
-//      _ <- insert(AddFlagRequest(key = "always_on8", rules = List(Rule(AlwaysOn())))).transact(xa)
-      hh <- loadUsers.transact(xa)
-    } yield hh
-  }
-
-
-
+  
   val app: ConnectionIO[Unit] = for {
     _ <- dropTable
     _ <- createTable
   } yield ()
 
-  def allFlags(): ZIO[Any, Throwable, List[FeatureFlag]] = execute()
+  private def execute(xa: Transactor[Task]): ZIO[Any, Throwable, List[FeatureFlag]] = {
+    for {
+//      _ <- dropTable.transact(xa)
+//      _ <- createTable.transact(xa)
+      //      _ <- insert(AddFlagRequest(key = "always_on8", rules = List(Rule(AlwaysOn())))).transact(xa)
+      hh <- loadUsers.transact(xa)
+    } yield hh
+  }
+
+  def toDTO(flags: List[FeatureFlag]): List[GetFlagResponse] = {
+    flags.map(flag => GetFlagResponse(
+      id = flag.id,
+      key = flag.key,
+      rules = flag.rules,
+      created_at = flag.created_at.toString,
+      updated_at = flag.updated_at.toString
+    ))
+
+  }
 
 }
