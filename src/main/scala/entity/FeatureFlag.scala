@@ -3,8 +3,7 @@ package entity
 import zio.json.{DeriveJsonCodec, DeriveJsonEncoder, JsonCodec, JsonEncoder}
 
 import java.sql.Timestamp
-
-case class FeatureFlag(id: Int, key: String, rules: List[Rule], created_at: Timestamp, updated_at: Timestamp)
+case class FeatureFlag(flag_id: Int, key: String, rules: List[Rule], created_at: Timestamp, updated_at: Timestamp)
 
 object FeatureFlag {
 //  implicit val encoderTimestaml: JsonEncoder[Timestamp] = DeriveJsonEncoder.gen[Timestamp]

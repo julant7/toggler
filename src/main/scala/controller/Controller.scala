@@ -6,6 +6,7 @@ import service.FeatureService
 import zio.*
 import zio.json.*
 import zio.http.*
+import zio.http.Status.InternalServerError
 
 
 val routes: Routes[FeatureService, Response] = Routes(
@@ -32,13 +33,21 @@ val routes: Routes[FeatureService, Response] = Routes(
         case Left(message) => ZIO.succeed(Response.json(message).status(Status.BadRequest))
         case Right(requestBody) => service.upsert(requestBody).map(_ => Response.ok)
       }
-    } yield result).mapError(err => Response.status(Status.InternalServerError))
+    } yield result).mapError(err => {
+      Response.json(err.getMessage).status(Status.InternalServerError)
+    })
   },
   Method.GET / "flags" -> handler { (req: Request) =>
     for {
       service <- ZIO.service[FeatureService]
       result <- service.getAll
     } yield Response.text(result.toJson)
+  },
+  Method.POST / "update" -> handler { (req: Request) =>
+    (for {
+      service <- ZIO.service[FeatureService]
+      _ <- service.updateCache()
+    } yield Response.ok).mapError(err => Response.json(err.getMessage).status(InternalServerError))
   },
 
 

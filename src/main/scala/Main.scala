@@ -33,6 +33,7 @@ object Main extends ZIOAppDefault {
 //    } yield response
 //    println(List(Rule(condition = AlwaysOn())).toJson)
     val postgresFeatureServiceLayer = DbConnector.layer >>> PostgresFeatureService.layer
+    
     Server.serve(routes).provide(postgresFeatureServiceLayer, Server.defaultWithPort(8090))
   }
 }
