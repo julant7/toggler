@@ -1,6 +1,6 @@
 package service
 
-import dto.{AddFlagRequest, CheckRequest, CheckResponse, GetFlagsResponse}
+import dto.{AddFlagRequest, CheckRequest, CheckResponse, DeleteFlagRequest, GetFlagsResponse}
 import zio.{UIO, ZIO}
 
 trait FeatureService {
@@ -10,5 +10,7 @@ trait FeatureService {
   
   def getAll: UIO[GetFlagsResponse]
   
-  def updateCache(): zio.ZIO[Any, Throwable, Unit]
+  def updateCache(): ZIO[Any, Throwable, Unit]
+  
+  def delete(deletingFlag: DeleteFlagRequest): ZIO[Any, Throwable, Unit]
 }

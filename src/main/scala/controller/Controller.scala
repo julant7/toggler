@@ -1,12 +1,12 @@
 package controller
 
-import dto.{AddFlagRequest, CheckRequest, CheckResponse, GetFlagsResponse}
+import dto.{AddFlagRequest, CheckRequest, CheckResponse, DeleteFlagRequest, GetFlagsResponse}
 import entity.{AlwaysOn, FeatureFlag, Rule}
 import service.FeatureService
 import zio.*
 import zio.json.*
 import zio.http.*
-import zio.http.Status.InternalServerError
+import zio.http.Status.{BadRequest, InternalServerError}
 
 
 val routes: Routes[FeatureService, Response] = Routes(
@@ -43,13 +43,23 @@ val routes: Routes[FeatureService, Response] = Routes(
       result <- service.getAll
     } yield Response.text(result.toJson)
   },
-  Method.POST / "update" -> handler { (req: Request) =>
+  Method.POST / "cache" -> handler { (req: Request) =>
     (for {
       service <- ZIO.service[FeatureService]
       _ <- service.updateCache()
     } yield Response.ok).mapError(err => Response.json(err.getMessage).status(InternalServerError))
   },
-
+  Method.DELETE / "flags" -> handler { (req: Request) =>
+    val deleteFlagRequest = req.body.asString.map(_.fromJson[DeleteFlagRequest])
+    (for  {
+      requestBody <- deleteFlagRequest
+      service <- ZIO.service[FeatureService]
+      _ <- requestBody match {
+        case Left(message) => ZIO.succeed(Response.json(message).status(BadRequest))
+        case Right(request) => service.delete(request)
+      }
+    } yield Response.ok).mapError(err => Response.json(err.getMessage).status(InternalServerError))
+  },
 
 )
 //object Controller extends ZIOAppDefault {
