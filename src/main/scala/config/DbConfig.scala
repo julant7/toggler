@@ -24,18 +24,3 @@ object DbConfig {
   }
 }
 
-final case class AppConfig(db: DbConfig) {
-
-}
-
-object AppConfig {
-
-  def getProperties: Properties = {
-    val prop = new Properties()
-    prop.load(Thread.currentThread().getContextClassLoader.getResourceAsStream("application.yaml"))
-    prop
-  }
-
-//  val layer: zio.ZLayer[Any, Throwable, zio.Ref[DbConfig]] = ZLayer.fromZIO(DbConfig.refFromFile(""))
-
-}

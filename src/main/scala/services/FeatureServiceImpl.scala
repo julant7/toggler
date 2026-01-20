@@ -1,4 +1,4 @@
-package service
+package services
 
 import doobie.*
 import doobie.implicits.*
@@ -13,7 +13,7 @@ import zio.interop.catz.*
 import java.sql.Timestamp
 import java.time.LocalDateTime
 
-class PostgresFeatureService(flags: Ref[Map[String, FeatureFlag]], snapshotDate: Ref[Timestamp], xa: Transactor[Task]) extends FeatureService {
+class FeatureServiceImpl(flags: Ref[Map[String, FeatureFlag]], snapshotDate: Ref[Timestamp], xa: Transactor[Task]) extends FeatureService {
 
   implicit val metaListRule: Meta[List[Rule]] = new Meta(pgDecoderGet, pgEncoderPut)
   implicit val metaJson: Meta[Json] = new Meta(pgDecoderGet, pgEncoderPut)
@@ -28,11 +28,11 @@ class PostgresFeatureService(flags: Ref[Map[String, FeatureFlag]], snapshotDate:
 
   override def getAll: UIO[GetFlagsResponse] = flags.get.map(flags => GetFlagsResponse(toDTO(flags.values.toList)))
 
-  override def upsert(request: AddFlagRequest): ZIO[Any, Throwable, Unit] = {
+  override def upsert(request: AddFlagRequest): ZIO[Any, Throwable, Int] = {
     for {
       updatedFlag <- insert(request).transact(xa)
       _ <- flags.update(_ + (updatedFlag.key -> updatedFlag))
-    } yield ()
+    } yield (updatedFlag.flag_id)
   }
 
   override def updateCache(): zio.ZIO[Any, Throwable, Unit] = {
@@ -57,8 +57,6 @@ class PostgresFeatureService(flags: Ref[Map[String, FeatureFlag]], snapshotDate:
     } yield ()
   }
 
-  def allFlags(): ZIO[Any, Throwable, List[FeatureFlag]] = PostgresFeatureService.execute(xa)
-
   private def dropTable: doobie.ConnectionIO[Int] =
     sql"""DROP TABLE IF EXISTS FLAGS""".update.run
 
@@ -71,7 +69,7 @@ class PostgresFeatureService(flags: Ref[Map[String, FeatureFlag]], snapshotDate:
 
   private val app: ConnectionIO[Unit] = for {
     _ <- dropTable
-    _ <- PostgresFeatureService.createTable
+    _ <- FeatureServiceImpl.createTable
   } yield ()
 
   private def toDTO(flags: List[FeatureFlag]): List[GetFlagResponse] = {
@@ -98,23 +96,22 @@ class PostgresFeatureService(flags: Ref[Map[String, FeatureFlag]], snapshotDate:
                    VALUES(${request.key}, ${request.rules.asJson})
                    ON CONFLICT(key)
                    DO UPDATE SET rules = EXCLUDED.rules
-                   RETURNING flag_id, key, rules, created_at, updated_at
+                   RETURNING flag_id, key, rules, created_at, updated_at, is_deleted
                  """.query[FeatureFlag].unique
   }
 
 
 }
-object PostgresFeatureService {
+object FeatureServiceImpl {
 
   implicit val metaListRule: Meta[List[Rule]] = new Meta(pgDecoderGet, pgEncoderPut)
   implicit val metaJson: Meta[Json] = new Meta(pgDecoderGet, pgEncoderPut)
 
-  val layer: ZLayer[DbConnector, Throwable, FeatureService] = ZLayer{
-
-    val flagMap: ZIO[DbConnector, Throwable, Map[String, FeatureFlag]] = {
+  val layer: ZLayer[Connector, Throwable, FeatureServiceImpl] = ZLayer{
+    val flagMap: ZIO[Connector, Throwable, Map[String, FeatureFlag]] = {
       for {
-        dbConnector <- ZIO.service[DbConnector]
-        flags <- execute(dbConnector.transactor)
+        connector <- ZIO.service[Connector]
+        flags <- execute(connector.transactor)
       } yield {
         flags.map(el => (el.key -> el)).toMap
       }
@@ -126,8 +123,8 @@ object PostgresFeatureService {
         flags <- flagMap
         refFlags <- Ref.make(flags)
         refDate <- Ref.make(timestampNow)
-        dbConnector <- ZIO.service[DbConnector]
-      } yield PostgresFeatureService(refFlags, refDate, dbConnector.transactor)
+        connector <- ZIO.service[Connector]
+      } yield FeatureServiceImpl(refFlags, refDate, connector.transactor)
 
     for {
       service <- postgresFeatureService

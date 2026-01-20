@@ -1,5 +1,5 @@
 import entity.UserContext
-import service.{DbConnector, FeatureService, PostgresFeatureService}
+import services.{DbConnector, FeatureService, FeatureServiceImpl}
 import zio.ZIO
 import zio.test.*
 

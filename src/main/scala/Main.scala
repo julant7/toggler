@@ -1,7 +1,7 @@
 import controller.routes
 import dto.{CheckRequest, CheckResponse}
 import entity.{AlwaysOn, Rule}
-import service.{DbConnector, FeatureService, PostgresFeatureService}
+import services.{DbConnector, FeatureService, FeatureServiceImpl}
 import zio.*
 import zio.http.*
 import zio.http.codec.HttpCodec
@@ -32,7 +32,7 @@ object Main extends ZIOAppDefault {
 //      response <- endpointExecutor(client)(endpoint("priv", CheckRequest("7", Map("priv" -> "priv"))))
 //    } yield response
 //    println(List(Rule(condition = AlwaysOn())).toJson)
-    val postgresFeatureServiceLayer = DbConnector.layer >>> PostgresFeatureService.layer
+    val postgresFeatureServiceLayer = DbConnector.layer() >>> FeatureServiceImpl.layer
     
     Server.serve(routes).provide(postgresFeatureServiceLayer, Server.defaultWithPort(8090))
   }
