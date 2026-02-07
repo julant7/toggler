@@ -28,11 +28,11 @@ class FeatureServiceImpl(flags: Ref[Map[String, FeatureFlag]], snapshotDate: Ref
 
   override def getAll: UIO[GetFlagsResponse] = flags.get.map(flags => GetFlagsResponse(toDTO(flags.values.toList)))
 
-  override def upsert(request: AddFlagRequest): ZIO[Any, Throwable, Int] = {
+  override def upsert(request: AddFlagRequest): ZIO[Any, Throwable, AddFlagResponse] = {
     for {
       updatedFlag <- insert(request).transact(xa)
       _ <- flags.update(_ + (updatedFlag.key -> updatedFlag))
-    } yield (updatedFlag.flag_id)
+    } yield (AddFlagResponse(updatedFlag.flag_id))
   }
 
   override def updateCache(): zio.ZIO[Any, Throwable, Unit] = {
@@ -50,20 +50,20 @@ class FeatureServiceImpl(flags: Ref[Map[String, FeatureFlag]], snapshotDate: Ref
     } yield ()
   }
 
-  override def delete(request: DeleteFlagRequest): ZIO[Any, Throwable, Unit] = {
+  override def delete(key: String): ZIO[Any, Throwable, Unit] = {
     for {
-      _ <- markRemoved(request, Timestamp.valueOf(LocalDateTime.now())).transact(xa)
-      _ <- flags.update(_.removed(request.key))
+      _ <- markRemoved(key, Timestamp.valueOf(LocalDateTime.now())).transact(xa)
+      _ <- flags.update(_.removed(key))
     } yield ()
   }
 
   private def dropTable: doobie.ConnectionIO[Int] =
     sql"""DROP TABLE IF EXISTS FLAGS""".update.run
 
-  private def markRemoved(request: DeleteFlagRequest, updatedAt: Timestamp): doobie.ConnectionIO[Int] = {
+  private def markRemoved(key: String, updatedAt: Timestamp): doobie.ConnectionIO[Int] = {
     sql"""UPDATE FLAGS
            SET is_deleted = true, updated_at = $updatedAt
-           WHERE key = ${request.key}""".stripMargin.update.run
+           WHERE key = $key""".stripMargin.update.run
   }
 
 

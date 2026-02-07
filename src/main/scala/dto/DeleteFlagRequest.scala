@@ -8,7 +8,5 @@ case class DeleteFlagRequest(key: String)
 
 object DeleteFlagRequest {
   implicit val codec: JsonCodec[DeleteFlagRequest] = DeriveJsonCodec.gen[DeleteFlagRequest]
-  implicit val schema: Schema[CheckResponse] = {
-    DeriveSchema.gen
-  }
+  implicit val schema: Schema[CheckResponse] = DeriveSchema.gen
 }

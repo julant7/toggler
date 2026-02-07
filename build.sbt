@@ -8,6 +8,7 @@ lazy val root = (project in file("."))
   )
 
 val zioVersion = "2.1.23"
+val zioTestkitVersion = "3.8.1"
 val catsEffectVersion = "3.6.3"
 val doobieCoreVersion = "1.0.0-RC11"
 val zioHttpVersion = "3.7.4"
@@ -24,8 +25,9 @@ libraryDependencies ++= {
   Seq(
     "dev.zio"        %% "zio"                             % zioVersion,
     "dev.zio"        %% "zio-streams"                     % zioVersion,
-    "dev.zio"        %% "zio-test"                        % zioVersion % Test,
-    "dev.zio"        %% "zio-test-sbt"                    % zioVersion % Test,
+    "dev.zio"        %% "zio-test"                        % zioVersion             % Test,
+    "dev.zio"        %% "zio-test-sbt"                    % zioVersion             % Test,
+    "dev.zio"        %% "zio-http-testkit"                % zioTestkitVersion      % Test,
     "dev.zio"        %% "zio-http"                        % zioHttpVersion,
     "dev.zio"        %% "zio-json"                        % zioJsonVersion,
     "dev.zio"        %% "zio-interop-cats"                % zioInteropCatsVersion,

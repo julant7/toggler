@@ -6,7 +6,7 @@ import layer.TestDbHelper
 import services.{DbConnector, FeatureServiceImpl}
 import zio.{Scope, ZIO}
 import zio.test.*
-import zio.test.TestAspect.beforeAll
+import zio.test.TestAspect.{before, beforeAll}
 
 object TestFeatureService extends ZIOSpecDefault {
   val TEST_DB_CONFIG_PATH = "src/test/resources/application.conf"
@@ -20,7 +20,7 @@ object TestFeatureService extends ZIOSpecDefault {
       val zio =
         for {
           service <- ZIO.service[FeatureServiceImpl]
-          flagId <- service.upsert(addFlagRequest)
+          flagId <- service.upsert(addFlagRequest).map(_.id)
           getFlagsResponse <- service.getAll
         } yield {
           val insertedFlag = getFlagsResponse.flags.filter(_.key == key).head
@@ -28,7 +28,6 @@ object TestFeatureService extends ZIOSpecDefault {
         }
 
       assertZIO(zio)(Assertion.equalTo(true))
-      Assertion.equalTo(true)
     },
     test("update existing feature") {
       val key = "feature5"
@@ -37,7 +36,7 @@ object TestFeatureService extends ZIOSpecDefault {
       val zio =
         for {
           service <- ZIO.service[FeatureServiceImpl]
-          flagId <- service.upsert(addFirstFlagRequest)
+          flagId <- service.upsert(addFirstFlagRequest).map(_.id)
           insertedFlagId <- service.upsert(addSecondFlagRequest)
           getFlagsResponse <- service.getAll
         } yield {
@@ -51,7 +50,7 @@ object TestFeatureService extends ZIOSpecDefault {
       val zio =
         for {
           service <- ZIO.service[FeatureServiceImpl]
-          _ <- service.delete(DeleteFlagRequest("feature3"))
+          _ <- service.delete("feature3")
           getFlagsResponse <- service.getAll
         } yield {
           getFlagsResponse.flags.find(_.key == key)
@@ -64,18 +63,17 @@ object TestFeatureService extends ZIOSpecDefault {
         for {
           service <- ZIO.service[FeatureServiceImpl]
           _ <- service.upsert(AddFlagRequest(key = "feature3", rules = List(Rule(condition = AlwaysOn()))))
-          _ <- service.delete(DeleteFlagRequest("feature3"))
+          _ <- service.delete("feature3")
           getFlagsResponse <- service.getAll
         } yield {
           getFlagsResponse.flags.find(_.key == key)
         }
       assertZIO(zio)(Assertion.equalTo(None))
     }
-  ).provide(featureServiceImpl) @@ beforeAll{
+  ).provide(featureServiceImpl) @@ before {
     (for {
       service <- ZIO.service[TestDbHelper]
       _ <- service.executeTruncate()
     } yield ()).provide(testDbHelperLayer)
   }
-//
 }

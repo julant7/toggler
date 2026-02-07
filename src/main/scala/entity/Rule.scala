@@ -15,7 +15,7 @@ object Rule {
   implicit val decoder: io.circe.Decoder[Rule] = deriveDecoder[Rule]
 }
 
-@jsonDiscriminator("type")
+//@jsonDiscriminator("type")
 sealed trait Condition
 
 object Condition {
@@ -28,8 +28,14 @@ object Condition {
 
 }
 
-@jsonHint("always_on") case class AlwaysOn() extends Condition
+case class AlwaysOn() extends Condition
 
-@jsonHint("user_list") case class UserList(userIds: Set[String]) extends Condition
+case class UserList(userIds: Set[String]) extends Condition
 
-@jsonHint("country_allow") case class CountryAllow(countries: Set[String]) extends Condition
+case class CountryAllow(countries: Set[String]) extends Condition
+
+//@jsonHint("always_on") case class AlwaysOn() extends Condition
+//
+//@jsonHint("user_list") case class UserList(userIds: Set[String]) extends Condition
+//
+//@jsonHint("country_allow") case class CountryAllow(countries: Set[String]) extends Condition

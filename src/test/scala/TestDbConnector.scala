@@ -4,9 +4,7 @@ import services.Connector
 import zio.{Task, ZLayer}
 import zio.interop.catz.*
 
-class TestDbConnector(transactor: Transactor[Task]) extends Connector(transactor) {
-
-}
+class TestDbConnector(transactor: Transactor[Task]) extends Connector(transactor)
 
 object TestDbConnector {
   val layer: ZLayer[Any, Throwable, TestDbConnector] = ZLayer{

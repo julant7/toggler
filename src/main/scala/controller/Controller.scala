@@ -30,7 +30,7 @@ import zio.json.*
         service <- ZIO.service[FeatureService]
         result <- request match {
           case Left(message) => ZIO.succeed(Response.json(message).status(Status.BadRequest))
-          case Right(requestBody) => service.upsert(requestBody).map(_ => Response.ok)
+          case Right(requestBody) => service.upsert(requestBody).map(el => Response.json(el.toJson))
         }
       } yield result).mapError(err => {
         Response.json(err.getMessage).status(Status.InternalServerError)
@@ -42,23 +42,16 @@ import zio.json.*
         result <- service.getAll
       } yield Response.text(result.toJson)
     },
-    Method.POST / "cache" -> handler { (req: Request) =>
-      (for {
-        service <- ZIO.service[FeatureService]
-        _ <- service.updateCache()
-      } yield Response.ok).mapError(err => Response.json(err.getMessage).status(InternalServerError))
-    },
     Method.DELETE / "flags" -> handler { (req: Request) =>
-      val deleteFlagRequest = req.body.asString.map(_.fromJson[DeleteFlagRequest])
+      val featureKey = req.url.queryParams("featureKey").asString
       (for {
-        requestBody <- deleteFlagRequest
         service <- ZIO.service[FeatureService]
-        _ <- requestBody match {
-          case Left(message) => ZIO.succeed(Response.json(message).status(BadRequest))
-          case Right(request) => service.delete(request)
-        }
+        _ <- service.delete(featureKey)
       } yield Response.ok).mapError(err => Response.json(err.getMessage).status(InternalServerError))
     },
+    Method.POST / "rerer" -> handler { (req: Request) => {
+      ZIO.succeed(Response.ok)
+    }}
 
   )
 //}
