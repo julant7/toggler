@@ -33,7 +33,7 @@ jobs:
     env:
       PGHOST: localhost
       PGDATABASE: testdb
-      PGUSERNAME: testpass
+      PGUSERNAME: testuser
       PGPASSWORD: testpass
           
     steps:
