@@ -45,10 +45,17 @@ jobs:
       uses: sbt/setup-sbt@v1
     - name: Wait for PostgreSQL
       run: |
-        until pg_isready -h localhost -p 5432; do
-          echo "Waiting for PostgreSQL"
+        echo "Waiting for PostgreSQL to be ready..."
+        for i in {1..15}; do
+          if pg_isready -h localhost -p 5432 -U testuser -d testdb; then
+            echo "PostgreSQL is ready!"
+            exit 0
+          fi
+          echo "Attempt $i/15: PostgreSQL not ready yet..."
           sleep 2
         done
+        echo "Failed to connect to PostgreSQL after 30 attempts"
+        exit 1
     - name: Run tests
       run: sbt test
       env:
