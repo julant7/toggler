@@ -30,6 +30,11 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+    env:
+      PGHOST: localhost
+      PGDATABASE: testdb
+      PGUSERNAME: testpass
+      PGPASSWORD: testpass
           
     steps:
     - uses: actions/checkout@v4
@@ -43,18 +48,50 @@ jobs:
         cache: 'sbt'
     - name: Install sbt
       uses: sbt/setup-sbt@v1
+    - name: Add PostgreSQL binaries to PATH
+      shell: bash
+      run: |
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          echo "$PGBIN" >> $GITHUB_PATH
+        elif [ "$RUNNER_OS" == "Linux" ]; then
+          echo "$(pg_config --bindir)" >> $GITHUB_PATH
+        fi
+    - name: Start preinstalled PostgreSQL
+      shell: bash
+      run: |
+        echo "Initializing database cluster..."
+
+        # Convert backslashes to forward slashes in RUNNER_TEMP for Windows Git Bash
+        export PGHOST="${RUNNER_TEMP//\\//}/postgres"
+        export PGDATA="$PGHOST/pgdata"
+        mkdir -p "$PGDATA"
+
+        # initdb requires file for password in non-interactive mode
+        export PWFILE="$RUNNER_TEMP/pwfile"
+        echo "postgres" > "$PWFILE"
+        initdb --pgdata="$PGDATA" --username="postgres" --pwfile="$PWFILE"
+
+        echo "Starting PostgreSQL..."
+        echo "unix_socket_directories = '$PGHOST'" >> "$PGDATA/postgresql.conf"
+        pg_ctl start
+
+        echo "Creating user..."
+        psql --host "$PGHOST" --username="postgres" --dbname="postgres" --command="CREATE USER $PGUSERNAME PASSWORD '$PGPASSWORD'" --command="\du"
+
+        echo "Creating database..."
+        createdb --owner="$PGUSERNAME" --username="postgres" "$PGDATABASE"
     - name: Wait for PostgreSQL
       run: |
         echo "Waiting for PostgreSQL to be ready..."
-        for i in {1..15}; do
+        for i in {1..10}; do
           if pg_isready -h localhost -p 5432 -U testuser -d testdb; then
             echo "PostgreSQL is ready!"
             exit 0
           fi
-          echo "Attempt $i/15: PostgreSQL not ready yet..."
+          echo "Attempt $i/10: PostgreSQL not ready yet..."
           sleep 2
         done
-        echo "Failed to connect to PostgreSQL after 30 attempts"
+        echo "Failed to connect to PostgreSQL after 10 attempts"
         exit 1
     - name: Run tests
       run: sbt test
