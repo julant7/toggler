@@ -18,7 +18,19 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          
     steps:
     - uses: actions/checkout@v4
     - name: Set up JDK 11
@@ -29,7 +41,13 @@ jobs:
         cache: 'sbt'
     - name: Run tests
       run: sbt test
+      env:
+        TEST_DATABASE_JDBC_URL: "jdbc:postgresql://localhost:5432/testdb"
+        TEST_DATABASE_USER: testuser
+        TEST_DATABASE_PASSWORD: testpass
       # Optional: This step uploads information to the GitHub dependency graph and unblocking Dependabot alerts for the repository
     - name: Upload dependency graph
       uses: scalacenter/sbt-dependency-submission@ab086b50c947c9774b70f39fc7f6e20ca2706c91
+    
+    
     
