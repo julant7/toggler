@@ -1,8 +1,8 @@
 import cats.implicits.*
+import com.dimafeng.testcontainers.PostgreSQLContainer
 import doobie.Transactor
 import entity.FeatureFlag
-import services.Connector
-import services.FeatureServiceImpl.createTable
+import services.{Connector, DbConnector}
 import zio.{Task, ZIO, ZLayer}
 import zio.interop.catz.*
 import doobie.*
@@ -11,16 +11,16 @@ import doobie.implicits.*
 class TestDbConnector(transactor: Transactor[Task]) extends Connector(transactor)
 
 object TestDbConnector {
-  val layer: ZLayer[Nothing, Any, Option[Any]] = ZLayer{
-    (for {
-      config <- TestDbConfig.refFromFile()
-    } yield TestDbConnector(Transactor.fromDriverManager[Task](
-      driver = config.driverClassName,
-      url = config.jdbcUrl,
-      user = config.user,
-      password = config.password,
+  val layer: ZLayer[PostgreSQLContainer, Nothing, DbConnector] = ZLayer{
+    for {
+      container <- ZIO.service[PostgreSQLContainer]
+    } yield DbConnector(Transactor.fromDriverManager[Task](
+      driver = container.driverClassName,
+      url = container.jdbcUrl,
+      user = container.username,
+      password = container.password,
       logHandler = None
-    ))).forEachZIO(conn => createTable(conn.transactor))
+    ))
   }
 
   def createTable: doobie.ConnectionIO[Int] =

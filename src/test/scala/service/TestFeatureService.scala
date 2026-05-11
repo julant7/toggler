@@ -1,5 +1,6 @@
 package service
 
+//import TestDbConnector.createTable
 import dto.{AddFlagRequest, DeleteFlagRequest}
 import entity.{AlwaysOn, Condition, Rule, UserList}
 import layer.TestDbHelper
@@ -10,7 +11,8 @@ import zio.test.TestAspect.{before, beforeAll}
 
 object TestFeatureService extends ZIOSpecDefault {
   val TEST_DB_CONFIG_PATH = "src/test/resources/application.conf"
-  private val dbConnectorLayer = DbConnector.layer(TEST_DB_CONFIG_PATH)
+  private val testContainer = TestContainer.layer
+  private val dbConnectorLayer = TestDbConnector.layer(TEST_DB_CONFIG_PATH)
   private val featureServiceImpl = dbConnectorLayer >>> FeatureServiceImpl.layer
   private val testDbHelperLayer = dbConnectorLayer >>> TestDbHelper.layer
   override def spec: Spec[TestEnvironment & Scope, Throwable] = suite("operations with features")(
@@ -75,5 +77,12 @@ object TestFeatureService extends ZIOSpecDefault {
       service <- ZIO.service[TestDbHelper]
       _ <- service.executeTruncate()
     } yield ()).provide(testDbHelperLayer)
+  } @@ beforeAll {
+    (for {
+      conn <- ZIO.service[DbConnector]
+    } yield {
+      TestDbConnector.createTable(conn.transactor)
+      ()
+    }).provide(dbConnectorLayer)
   }
 }
